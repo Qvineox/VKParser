@@ -87,13 +87,25 @@ namespace VKParser
                 for (int i = 0; i < news.Count(); i++)
                 {
                     postList.Add(new Post(news[i], i));
-                    Console.WriteLine(postList[i].ToString());
+                    if (postList[i].id != null) { 
+                        Console.WriteLine(postList[i].ToString());
+                    }
                 }
 
-                toJSON.SerializeImages(postList, "images.json");
+                //Thread textWriteThread = new Thread(new ThreadStart(toJSON.SerializeText));
+                //Thread imagesWriteThread = new Thread(toJSON.SerializeImages(postList, "images.json"));
+                //Thread linksWriteThread = new Thread(toJSON.SerializeLinks(postList, "links.json"));
+
+                toJSON.SerializeImages(postList, "images.json"); 
                 toJSON.SerializeText(postList, "texts.json");
+                toJSON.SerializeLinks(postList, "links.json");
 
                 //StopSelenium();
+
+                void Serialization(object settings)
+                {
+
+                }
             }
 
             public static IWebElement find(byType type, string target)
@@ -246,12 +258,12 @@ namespace VKParser
 
             public Post(IWebElement post, int counter)
             {
+                this.counter = counter;
                 //id новости
                 List<IWebElement> linkElements = (from item in post.FindElements(By.XPath(@".//div")) where item.Displayed select item).ToList();
                 if (!linkElements.Any())
                 {
                     id = null;
-                    return;
                 }
                 else id = linkElements[0].GetAttribute("id");
 
@@ -260,23 +272,38 @@ namespace VKParser
                 if (!imageElements.Any())
                 {
                     imageURLs = null;
-                    return;
                 }
-                imageURLs = new List<string>();
-                foreach (var img in imageElements)
+                else
                 {
-                    imageURLs.Add(img.GetCssValue("background-image").Replace("url", "").Replace("(", "").Replace(")", "").Replace("\"", ""));
+                    imageURLs = new List<string>();
+                    foreach (var img in imageElements)
+                    {
+                        imageURLs.Add(img.GetCssValue("background-image").Replace("url", "").Replace("(", "").Replace(")", "").Replace("\"", ""));
+                    }
                 }
 
                 //текст новости
-                this.counter = counter;
                 date = "0";
                 List<IWebElement> textElements = (from item in post.FindElements(By.XPath(@".//div[@class='wall_post_text']")) where item.Displayed select item).ToList();
                 if (!textElements.Any())
                 {
                     text = null;
-                    return;
-                } else text = textElements[0].Text;
+                } else text = textElements[0].Text.Replace("\n", " ");
+
+                //ссылки в новости
+                List<IWebElement> linksElements = (from item in post.FindElements(By.XPath(@".//div[@class='wall_post_text']//a")) where item.Displayed select item).ToList();
+                if (!linksElements.Any())
+                {
+                    links = null;
+                }
+                else
+                {
+                    links = new List<string>();
+                    foreach (var link in linksElements)
+                    {
+                        links.Add(link.GetAttribute("href"));
+                    }
+                }
             }
             public override string ToString()
             {
@@ -287,11 +314,25 @@ namespace VKParser
                         imageLinks += link + "\n ";
                     }
                 }
-                string line = string.Format("Post #{0}: \n Id: {1} \n Text: {2} \n Images:{3} \n Timestamp: {4} \n", counter, id, text, imageLinks, date);
+
+                string hrefLinks = "";
+                if (links != null)
+                {
+                    foreach (string link in links)
+                    {
+                        hrefLinks += link + "\n ";
+                    }
+                }
+
+                string line = string.Format("Post #{0}: \n Id: {1} \n Text: {2} \n Images:\n {3}Links:\n {4} \n", counter, id, text, imageLinks, hrefLinks);
                 return line;
             }
 
             private void toJSON() { }
+        }
+        internal static class settings
+        {
+
         }
     }
 }
