@@ -63,6 +63,7 @@ namespace VKParser
         {
             public static string login, password;
             private static ChromeDriver driver;
+            public static List<Post> postList;
 
             public enum byType {selector, className, name}
             public static void StartSelenium()
@@ -82,7 +83,7 @@ namespace VKParser
                 List<IWebElement> news = new List<IWebElement>();
                 news = driver.FindElementsByClassName("feed_row").ToList();
 
-                List<Post> postList = new List<Post>();
+                postList = new List<Post>();
 
                 for (int i = 0; i < news.Count(); i++)
                 {
@@ -96,16 +97,22 @@ namespace VKParser
                 //Thread imagesWriteThread = new Thread(toJSON.SerializeImages(postList, "images.json"));
                 //Thread linksWriteThread = new Thread(toJSON.SerializeLinks(postList, "links.json"));
 
-                toJSON.SerializeImages(postList, "images.json"); 
-                toJSON.SerializeText(postList, "texts.json");
-                toJSON.SerializeLinks(postList, "links.json");
+                //toJSON.SerializeImages(postList, "images.json"); 
+                //toJSON.SerializeText(postList, "texts.json");
+                //toJSON.SerializeLinks(postList, "links.json");
 
                 //StopSelenium();
 
-                void Serialization(object settings)
-                {
+                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
 
-                }
+                Thread imagesThread = new Thread(new ThreadStart(writerSettings.imageThread));
+                Thread textThread = new Thread(new ThreadStart(writerSettings.textThread));
+                Thread linksThread = new Thread(new ThreadStart(writerSettings.linkThread));
+                imagesThread.Start();
+                textThread.Start();
+                linksThread.Start();
+
+                Console.WriteLine("Main ended!");
             }
 
             public static IWebElement find(byType type, string target)
@@ -330,9 +337,33 @@ namespace VKParser
 
             private void toJSON() { }
         }
-        internal static class settings
+        internal class settings
         {
+            string imagesFileName, linksFileName, textFileName;
+            List<Post> postList;
+            public settings(string imagesFileName, string linksFileName, string textFileName, List<Post> postList)
+            {
+                this.imagesFileName = imagesFileName;
+                this.linksFileName = linksFileName;
+                this.textFileName = textFileName;
+                this.postList = postList;
+            }
 
+            public void imageThread()
+            {
+                Console.WriteLine("Started writing images!");
+                toJSON.SerializeImages(postList, imagesFileName);
+            }
+            public void linkThread()
+            {
+                Console.WriteLine("Started writing images!");
+                toJSON.SerializeLinks(postList, linksFileName);
+            }
+            public void textThread()
+            {
+                Console.WriteLine("Started writing images!");
+                toJSON.SerializeText(postList, textFileName);
+            }
         }
     }
 }
