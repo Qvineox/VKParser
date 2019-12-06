@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.ServiceProcess;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,9 +46,16 @@ namespace VKParser
             //Parser.StopSelenium();
             //mainThread.Join();
         }
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void Button_Login(object sender, RoutedEventArgs e)
         {
             //TextBox textBox = 
+        }
+        private void Button_Loop(object sender, RoutedEventArgs e)
+        {
+            serviceController serviceHandler = new serviceController();
+            serviceHandler.startService();
+            Thread.Sleep(5000);
+            serviceHandler.stopService();
         }
         public void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -88,7 +96,7 @@ namespace VKParser
                 for (int i = 0; i < news.Count(); i++)
                 {
                     postList.Add(new Post(news[i], i));
-                    if (postList[i].id != null) { 
+                    if (postList[i].postId != null) { 
                         Console.WriteLine(postList[i].ToString());
                     }
                 }
@@ -113,6 +121,9 @@ namespace VKParser
                 linksThread.Start();
 
                 Console.WriteLine("Main ended!");
+
+                imagesThread.Join();
+                toJSON.Deserialize("imagesT.json");
             }
 
             public static IWebElement find(byType type, string target)
@@ -149,15 +160,20 @@ namespace VKParser
             {
 
                 [DataMember]
-                public string id { get; set; }
+                public string postId { get; set; }
 
                 [DataMember]
                 public string[] images { get; set; }
 
                 public postImage(Post post)
                 {
-                    id = post.id;
+                    postId = post.postId;
                     images = (post.imageURLs).ToArray();
+                }
+
+                public postImage()
+                {
+
                 }
             }
 
@@ -166,14 +182,14 @@ namespace VKParser
             {
 
                 [DataMember]
-                public string id { get; set; }
+                public string postId { get; set; }
 
                 [DataMember]
                 public string[] links { get; set; }
 
                 public postLink(Post post)
                 {
-                    id = post.id;
+                    postId = post.postId;
                     links = (post.links).ToArray();
                 }
             }
@@ -183,14 +199,14 @@ namespace VKParser
             {
 
                 [DataMember]
-                public string id { get; set; }
+                public string postId { get; set; }
 
                 [DataMember]
                 public string text { get; set; }
 
                 public postText(Post post)
                 {
-                    id = post.id;
+                    postId = post.postId;
                     text = post.text;
                 }
             }
@@ -200,7 +216,7 @@ namespace VKParser
                 List<postImage> postImages = new List<postImage>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
-                    if ((postList[i].id != null) && (postList[i].imageURLs != null))
+                    if ((postList[i].postId != null) && (postList[i].imageURLs != null))
                     {
                         postImages.Add(new postImage(postList[i]));
                     }
@@ -209,7 +225,7 @@ namespace VKParser
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postImages);
 
-                using (StreamWriter sw = new StreamWriter(filename, true, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
                 {
                     sw.WriteLine(json);
                 }
@@ -219,7 +235,7 @@ namespace VKParser
                 List<postLink> postLinks = new List<postLink>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
-                    if ((postList[i].id != null) && (postList[i].links != null))
+                    if ((postList[i].postId != null) && (postList[i].links != null))
                     {
                         postLinks.Add(new postLink(postList[i]));
                     }
@@ -228,7 +244,7 @@ namespace VKParser
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postLinks);
 
-                using (StreamWriter sw = new StreamWriter(filename, true, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
                 {
                     sw.WriteLine(json);
                 }
@@ -238,7 +254,7 @@ namespace VKParser
                 List<postText> postTexts = new List<postText>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
-                    if ((postList[i].id != null) && (postList[i].text != null)) {
+                    if ((postList[i].postId != null) && (postList[i].text != null)) {
                         postTexts.Add(new postText(postList[i]));
                     }
                 }
@@ -246,20 +262,28 @@ namespace VKParser
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postTexts);
 
-                using (StreamWriter sw = new StreamWriter(filename, true, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
                 {
                     sw.WriteLine(json);
                 }
             }
             public static void Deserialize(string filename)
             {
+                string json;
+                using (StreamReader sr = new StreamReader(filename))
+                {
+                    json = sr.ReadToEnd();
+                }
 
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                List<postImage> images = serializer.Deserialize<List<postImage>>(json);
+                Console.WriteLine(images);
             }
         }
         internal class Post
         {
             int counter;
-            public string id, text, date;
+            public string postId, text, date;
             public List<string> imageURLs;
             public List<string> links;
 
@@ -270,9 +294,9 @@ namespace VKParser
                 List<IWebElement> linkElements = (from item in post.FindElements(By.XPath(@".//div")) where item.Displayed select item).ToList();
                 if (!linkElements.Any())
                 {
-                    id = null;
+                    postId = null;
                 }
-                else id = linkElements[0].GetAttribute("id");
+                else postId = linkElements[0].GetAttribute("id");
 
                 //картинки 
                 List<IWebElement> imageElements = (from item in post.FindElements(By.XPath(@".//div[@class='page_post_sized_thumbs  clear_fix']//a")) where item.Displayed select item).ToList();
@@ -331,7 +355,7 @@ namespace VKParser
                     }
                 }
 
-                string line = string.Format("Post #{0}: \n Id: {1} \n Text: {2} \n Images:\n {3}Links:\n {4} \n", counter, id, text, imageLinks, hrefLinks);
+                string line = string.Format("Post #{0}: \n Id: {1} \n Text: {2} \n Images:\n {3}Links:\n {4} \n", counter, postId, text, imageLinks, hrefLinks);
                 return line;
             }
 
@@ -353,16 +377,53 @@ namespace VKParser
             {
                 Console.WriteLine("Started writing images!");
                 toJSON.SerializeImages(postList, imagesFileName);
+                Console.WriteLine("Ended writing images!");
             }
             public void linkThread()
             {
-                Console.WriteLine("Started writing images!");
+                Console.WriteLine("Started writing links!");
                 toJSON.SerializeLinks(postList, linksFileName);
+                Console.WriteLine("Ended writing links!");
             }
             public void textThread()
             {
-                Console.WriteLine("Started writing images!");
+                Console.WriteLine("Started writing texts!");
                 toJSON.SerializeText(postList, textFileName);
+                Console.WriteLine("Ended writing texts!");
+            }
+        } 
+        internal class serviceController
+        {
+            public void startService()
+            {
+                Console.WriteLine("Попытка запуска службы...");
+                ServiceController service = new ServiceController("VKDBService");
+                if (service.Status != ServiceControllerStatus.Running)
+                {
+                    service.Start();
+                    service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(1));
+                    Console.WriteLine("Служба была успешно запущена!");
+                } else
+                {
+                    service.Stop();
+                    service.Start();
+                    Console.WriteLine("Служба была успешно перезапущена!");
+                }
+            }
+            public void stopService()
+            {
+                Console.WriteLine("Попытка остановки службы...");
+                ServiceController service = new ServiceController("VKDBService");
+                if (service.Status != ServiceControllerStatus.Stopped)
+                {
+                    service.Stop();
+                    service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(1));
+                    Console.WriteLine("Служба была успешно остановлена!");
+                }
+                else
+                {
+                    Console.WriteLine("Служба остановлена!");
+                }
             }
         }
     }
