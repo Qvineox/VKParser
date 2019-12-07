@@ -29,6 +29,7 @@ namespace VKParser
     public partial class MainWindow : Window
     {
         Thread mainThread = new Thread(Parser.StartSelenium);
+        Thread loopThread = new Thread(Parser.LoopSelenium);
         public MainWindow()
         {
             InitializeComponent();
@@ -52,10 +53,11 @@ namespace VKParser
         }
         private void Button_Loop(object sender, RoutedEventArgs e)
         {
-            serviceController serviceHandler = new serviceController();
-            serviceHandler.startService();
-            Thread.Sleep(5000);
-            serviceHandler.stopService();
+            if (Parser.login != null && Parser.login != null)
+            {
+                Console.WriteLine($"Login: {Parser.login} \nPassword: {Parser.password} \nStarting parsing...");
+                loopThread.Start();
+            }
         }
         public void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -74,19 +76,18 @@ namespace VKParser
             public static List<Post> postList;
 
             public enum byType {selector, className, name}
+            public enum jsonManager { image, text, link }
             public static void StartSelenium()
             {
                 driver = new ChromeDriver();
                 goTo("https://vk.com/");
 
-                //authentification
                 find(byType.selector, "#index_email").SendKeys(login);
                 find(byType.selector, "#index_pass").SendKeys(password);
                 find(byType.selector, "#index_login_button").Click();
 
-                //new WebDriverWait(driver, TimeSpan.FromSeconds(10)).Until(ExpectedConditions.ElementToBeClickable(By.ClassName("feed_row")));
-                //new WebDriverWait(driver, TimeSpan.FromSeconds(5));
-                Thread.Sleep(5000);
+                new WebDriverWait(driver, TimeSpan.FromSeconds(10)).Until(ExpectedConditions.ElementToBeClickable(By.ClassName("feed_row")));
+                //Thread.Sleep(5000);
 
                 List<IWebElement> news = new List<IWebElement>();
                 news = driver.FindElementsByClassName("feed_row").ToList();
@@ -101,31 +102,22 @@ namespace VKParser
                     }
                 }
 
-                //Thread textWriteThread = new Thread(new ThreadStart(toJSON.SerializeText));
-                //Thread imagesWriteThread = new Thread(toJSON.SerializeImages(postList, "images.json"));
-                //Thread linksWriteThread = new Thread(toJSON.SerializeLinks(postList, "links.json"));
-
-                //toJSON.SerializeImages(postList, "images.json"); 
-                //toJSON.SerializeText(postList, "texts.json");
-                //toJSON.SerializeLinks(postList, "links.json");
-
-                //StopSelenium();
-
                 settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
 
                 Thread imagesThread = new Thread(new ThreadStart(writerSettings.imageThread));
                 Thread textThread = new Thread(new ThreadStart(writerSettings.textThread));
                 Thread linksThread = new Thread(new ThreadStart(writerSettings.linkThread));
+
                 imagesThread.Start();
                 textThread.Start();
                 linksThread.Start();
-
-                Console.WriteLine("Main ended!");
-
                 imagesThread.Join();
-                toJSON.Deserialize("imagesT.json");
-            }
+                textThread.Join();
+                linksThread.Join();
 
+                Console.WriteLine("Первоначальная запись завершена!");
+                //toJSON.Deserialize("imagesT.json");
+            }
             public static IWebElement find(byType type, string target)
             {
                 switch (type)
@@ -144,9 +136,121 @@ namespace VKParser
             {
                 driver.Navigate().GoToUrl(target);
             }
-            public static void Checker()
+            public static void LoopSelenium()
             {
-                while (true) Console.WriteLine("Obama");
+                Console.WriteLine($"Login: {login} \nPassword: {password} \nStarting parsing...");
+
+                driver = new ChromeDriver();
+                goTo("https://vk.com/");
+
+                find(byType.selector, "#index_email").SendKeys(login);
+                find(byType.selector, "#index_pass").SendKeys(password);
+                find(byType.selector, "#index_login_button").Click();
+
+                new WebDriverWait(driver, TimeSpan.FromSeconds(10)).Until(ExpectedConditions.ElementToBeClickable(By.ClassName("feed_row")));
+                //Thread.Sleep(5000);
+
+                List<IWebElement> news = new List<IWebElement>();
+                news = driver.FindElementsByClassName("feed_row").ToList();
+
+                postList = new List<Post>();
+
+                for (int i = 0; i < news.Count(); i++)
+                {
+                    postList.Add(new Post(news[i], i));
+                    if (postList[i].postId != null)
+                    {
+                        Console.WriteLine(postList[i].ToString());
+                    }
+                }
+
+                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
+
+                Thread imagesThread = new Thread(new ThreadStart(writerSettings.imageThread));
+                Thread textThread = new Thread(new ThreadStart(writerSettings.textThread));
+                Thread linksThread = new Thread(new ThreadStart(writerSettings.linkThread));
+
+                imagesThread.Start();
+                textThread.Start();
+                linksThread.Start();
+                imagesThread.Join();
+                textThread.Join();
+                linksThread.Join();
+
+                Console.WriteLine("Первоначальная запись завершена!");
+
+                serviceController serviceHandler = new serviceController();
+
+                jsonManager switcher = jsonManager.image;
+
+                while (true)
+                {
+                    Thread imagesWriteThread = new Thread(new ThreadStart(writerSettings.imageThread));
+                    Thread textWriteThread = new Thread(new ThreadStart(writerSettings.textThread));
+                    Thread linksWriteThread = new Thread(new ThreadStart(writerSettings.linkThread));
+
+                    //Thread imagesReadThread = new Thread(new ThreadStart(writerSettings.imageReadThread));
+                    //Thread textReadThread = new Thread(new ThreadStart(writerSettings.textReadThread));
+                    //Thread linksReadThread = new Thread(new ThreadStart(writerSettings.linkReadThread));
+
+
+                    
+
+                    switch (switcher)
+                    {
+                        case (jsonManager.image):
+                            {
+                                Console.WriteLine("ВАЖНО: Начата итерация картинок...");
+                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                deserializeThread.Start();
+                                textWriteThread.Start();
+                                linksWriteThread.Start();
+
+                                deserializeThread.Join();
+                                textWriteThread.Join();
+                                linksWriteThread.Join();
+
+                                serviceHandler.operate();
+                                switcher = jsonManager.text;
+                                Console.WriteLine("ВАЖНО: Окончена итерация картинок...");
+                                break;
+                            }
+                        case (jsonManager.text):
+                            {
+                                Console.WriteLine("ВАЖНО: Начата итерация текста...");
+                                imagesWriteThread.Start();
+                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                deserializeThread.Start();
+                                linksWriteThread.Start();
+
+                                imagesWriteThread.Join();
+                                deserializeThread.Join();
+                                linksWriteThread.Join();
+
+                                serviceHandler.operate();
+                                switcher = jsonManager.link;
+                                Console.WriteLine("ВАЖНО: Окончена итерация текста...");
+                                break;
+                            }
+                        case (jsonManager.link):
+                            {
+                                Console.WriteLine("ВАЖНО: Начата итерация текста...");
+                                imagesWriteThread.Start();
+                                textWriteThread.Start();
+                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                deserializeThread.Start();
+
+                                imagesWriteThread.Join();
+                                textWriteThread.Join();
+                                deserializeThread.Join();
+
+                                serviceHandler.operate();
+                                switcher = jsonManager.image;
+                                Console.WriteLine("ВАЖНО: Окончена итерация текста...");
+                                break;
+                            }
+                    }
+                }
             }
             public static void StopSelenium()
             {
@@ -267,17 +371,51 @@ namespace VKParser
                     sw.WriteLine(json);
                 }
             }
-            public static void Deserialize(string filename)
+            public static void Deserialize(Parser.jsonManager switcher)
             {
-                string json;
-                using (StreamReader sr = new StreamReader(filename))
+                switch (switcher)
                 {
-                    json = sr.ReadToEnd();
-                }
+                    case (Parser.jsonManager.image):
+                        {
+                            string json;
+                            using (StreamReader sr = new StreamReader("imagesT.json"))
+                            {
+                                json = sr.ReadToEnd();
+                            }
 
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                List<postImage> images = serializer.Deserialize<List<postImage>>(json);
-                Console.WriteLine(images);
+                            JavaScriptSerializer serializer = new JavaScriptSerializer();
+                            List<postImage> images = serializer.Deserialize<List<postImage>>(json);
+                            Console.WriteLine(images);
+                            break;
+                        }
+                    case (Parser.jsonManager.text):
+                        {
+                            string json;
+                            using (StreamReader sr = new StreamReader("textsT.json"))
+                            {
+                                json = sr.ReadToEnd();
+                            }
+
+                            JavaScriptSerializer serializer = new JavaScriptSerializer();
+                            List<postImage> texts = serializer.Deserialize<List<postImage>>(json);
+                            Console.WriteLine(texts);
+                            break;
+                        }
+                    case (Parser.jsonManager.link):
+                        {
+                            string json;
+                            using (StreamReader sr = new StreamReader("linksT.json"))
+                            {
+                                json = sr.ReadToEnd();
+                            }
+
+                            JavaScriptSerializer serializer = new JavaScriptSerializer();
+                            List<postImage> links = serializer.Deserialize<List<postImage>>(json);
+                            Console.WriteLine(links);
+                            break;
+                        }
+                }
+                
             }
         }
         internal class Post
@@ -375,21 +513,36 @@ namespace VKParser
 
             public void imageThread()
             {
-                Console.WriteLine("Started writing images!");
+                Console.WriteLine("Начата запись картинок!");
                 toJSON.SerializeImages(postList, imagesFileName);
-                Console.WriteLine("Ended writing images!");
+                Console.WriteLine("Закончена запись картинок!");
             }
             public void linkThread()
             {
-                Console.WriteLine("Started writing links!");
+                Console.WriteLine("Начата запись ссылок!");
                 toJSON.SerializeLinks(postList, linksFileName);
-                Console.WriteLine("Ended writing links!");
+                Console.WriteLine("Закончена запись ссылок!");
             }
             public void textThread()
             {
-                Console.WriteLine("Started writing texts!");
+                Console.WriteLine("Начата запись текстов!");
                 toJSON.SerializeText(postList, textFileName);
-                Console.WriteLine("Ended writing texts!");
+                Console.WriteLine("Закончена запись текстов!");
+            }
+            public void imageReadThread()
+            {
+                Console.WriteLine("Начато чтение картинок...");
+                Console.WriteLine("Завершено чтение картинок...");
+            }
+            public void linkReadThread()
+            {
+                Console.WriteLine("Начато чтение ссылок...");
+                Console.WriteLine("Завершено чтение ссылок...");
+            }
+            public void textReadThread()
+            {
+                Console.WriteLine("Начато чтение текстов...");
+                Console.WriteLine("Завершено чтение текстов...");
             }
         } 
         internal class serviceController
@@ -401,12 +554,12 @@ namespace VKParser
                 if (service.Status != ServiceControllerStatus.Running)
                 {
                     service.Start();
-                    service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(1));
-                    Console.WriteLine("Служба была успешно запущена!");
                 } else
                 {
                     service.Stop();
+                    service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromMinutes(1));
                     service.Start();
+                    service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromMinutes(1));
                     Console.WriteLine("Служба была успешно перезапущена!");
                 }
             }
@@ -424,6 +577,14 @@ namespace VKParser
                 {
                     Console.WriteLine("Служба остановлена!");
                 }
+            }
+            public void operate()
+            {
+                startService();
+                ServiceController service = new ServiceController("VKDBService");
+                Console.WriteLine("Ожидание завершения работы службы...");
+                service.WaitForStatus(ServiceControllerStatus.Stopped);
+                stopService();
             }
         }
     }
