@@ -28,14 +28,13 @@ namespace VKParser
 {
     public partial class MainWindow : Window
     {
-        Thread mainThread = new Thread(Parser.StartSelenium);
-        Thread loopThread = new Thread(Parser.LoopSelenium);
         public MainWindow()
         {
             InitializeComponent();
         }
         public void Button_Launch(object sender, RoutedEventArgs e)
         {
+            Thread mainThread = new Thread(Parser.StartSelenium);
             if (Parser.login != null && Parser.login != null)
             {
                 Console.WriteLine($"Login: {Parser.login} \nPassword: {Parser.password} \nStarting parsing...");
@@ -44,18 +43,20 @@ namespace VKParser
         }
         private void Button_Shutdown(object sender, RoutedEventArgs e)
         {
-            //Parser.StopSelenium();
-            //mainThread.Join();
+            Parser.loop = false;
+            MessageBox.Show("Ожидайте завершения итерации...");
         }
         private void Button_Login(object sender, RoutedEventArgs e)
         {
-            //TextBox textBox = 
+             
         }
         private void Button_Loop(object sender, RoutedEventArgs e)
         {
+            Thread loopThread = new Thread(Parser.LoopSelenium);
             if (Parser.login != null && Parser.login != null)
             {
                 Console.WriteLine($"Login: {Parser.login} \nPassword: {Parser.password} \nStarting parsing...");
+                Parser.loop = true;
                 loopThread.Start();
             }
         }
@@ -74,7 +75,7 @@ namespace VKParser
             public static string login, password;
             private static ChromeDriver driver;
             public static List<Post> postList;
-
+            public static bool loop;
             public enum byType {selector, className, name}
             public enum jsonManager { image, text, link }
             public static void StartSelenium()
@@ -89,18 +90,7 @@ namespace VKParser
                 new WebDriverWait(driver, TimeSpan.FromSeconds(10)).Until(ExpectedConditions.ElementToBeClickable(By.ClassName("feed_row")));
                 //Thread.Sleep(5000);
 
-                List<IWebElement> news = new List<IWebElement>();
-                news = driver.FindElementsByClassName("feed_row").ToList();
-
-                postList = new List<Post>();
-
-                for (int i = 0; i < news.Count(); i++)
-                {
-                    postList.Add(new Post(news[i], i));
-                    if (postList[i].postId != null) { 
-                        Console.WriteLine(postList[i].ToString());
-                    }
-                }
+                getNews();
 
                 settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
 
@@ -115,8 +105,27 @@ namespace VKParser
                 textThread.Join();
                 linksThread.Join();
 
-                Console.WriteLine("Первоначальная запись завершена!");
-                //toJSON.Deserialize("imagesT.json");
+                Console.WriteLine("Одиночная запись завершена!");
+
+                serviceController handler = new serviceController();
+                handler.startService();
+
+                StopSelenium();
+            }
+            public static void getNews()
+            {
+                postList = new List<Post>();
+                List<IWebElement> news = new List<IWebElement>();
+                news = driver.FindElementsByClassName("feed_row").ToList();
+
+                for (int i = 0; i < news.Count(); i++)
+                {
+                    postList.Add(new Post(news[i], i));
+                    if (postList[i].postId != null)
+                    {
+                        Console.WriteLine(postList[i].ToString());
+                    }
+                }
             }
             public static IWebElement find(byType type, string target)
             {
@@ -150,19 +159,7 @@ namespace VKParser
                 new WebDriverWait(driver, TimeSpan.FromSeconds(10)).Until(ExpectedConditions.ElementToBeClickable(By.ClassName("feed_row")));
                 //Thread.Sleep(5000);
 
-                List<IWebElement> news = new List<IWebElement>();
-                news = driver.FindElementsByClassName("feed_row").ToList();
-
-                postList = new List<Post>();
-
-                for (int i = 0; i < news.Count(); i++)
-                {
-                    postList.Add(new Post(news[i], i));
-                    if (postList[i].postId != null)
-                    {
-                        Console.WriteLine(postList[i].ToString());
-                    }
-                }
+                getNews();
 
                 settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
 
@@ -183,18 +180,14 @@ namespace VKParser
 
                 jsonManager switcher = jsonManager.image;
 
-                while (true)
+                while (loop)
                 {
+                    driver.Navigate().Refresh();
+                    getNews();
+
                     Thread imagesWriteThread = new Thread(new ThreadStart(writerSettings.imageThread));
                     Thread textWriteThread = new Thread(new ThreadStart(writerSettings.textThread));
                     Thread linksWriteThread = new Thread(new ThreadStart(writerSettings.linkThread));
-
-                    //Thread imagesReadThread = new Thread(new ThreadStart(writerSettings.imageReadThread));
-                    //Thread textReadThread = new Thread(new ThreadStart(writerSettings.textReadThread));
-                    //Thread linksReadThread = new Thread(new ThreadStart(writerSettings.linkReadThread));
-
-
-                    
 
                     switch (switcher)
                     {
@@ -251,10 +244,16 @@ namespace VKParser
                             }
                     }
                 }
+
+                StopSelenium();
             }
             public static void StopSelenium()
             {
-                driver.Quit();
+                if (driver != null)
+                {
+                    driver.Quit();
+                    Thread.CurrentThread.Abort();
+                }
             }
         }
         internal static class toJSON
@@ -496,7 +495,6 @@ namespace VKParser
                 string line = string.Format("Post #{0}: \n Id: {1} \n Text: {2} \n Images:\n {3}Links:\n {4} \n", counter, postId, text, imageLinks, hrefLinks);
                 return line;
             }
-
             private void toJSON() { }
         }
         internal class settings
