@@ -28,6 +28,7 @@ namespace VKParser
 {
     public partial class MainWindow : Window
     {
+        public static List<Post> postList;
         public MainWindow()
         {
             InitializeComponent();
@@ -74,7 +75,6 @@ namespace VKParser
         {
             public static string login, password;
             private static ChromeDriver driver;
-            public static List<Post> postList;
             public static bool loop;
             public enum byType {selector, className, name}
             public enum jsonManager { image, text, link }
@@ -92,7 +92,7 @@ namespace VKParser
 
                 getNews();
 
-                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
+                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json");
 
                 Thread imagesThread = new Thread(new ThreadStart(writerSettings.imageThread));
                 Thread textThread = new Thread(new ThreadStart(writerSettings.textThread));
@@ -161,7 +161,7 @@ namespace VKParser
 
                 getNews();
 
-                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json", postList);
+                settings writerSettings = new settings("imagesT.json", "linksT.json", "textsT.json");
 
                 Thread imagesThread = new Thread(new ThreadStart(writerSettings.imageThread));
                 Thread textThread = new Thread(new ThreadStart(writerSettings.textThread));
@@ -314,14 +314,18 @@ namespace VKParser
                 }
             }
 
-            public static void SerializeImages(List<Post> postList, string filename)
+            public static void SerializeImages(string filename)
             {
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 List<postImage> postImages = new List<postImage>();
 
                 if (File.Exists("imagesT.json"))
                 {
-                    postImages.AddRange(Deserialize(Parser.jsonManager.image));
+                    List<postImage> oldPosts = Deserialize(Parser.jsonManager.image);
+                    if (oldPosts != null)
+                    {
+                        postImages.AddRange(Deserialize(Parser.jsonManager.image));
+                    }
                 }
 
                 
@@ -329,7 +333,7 @@ namespace VKParser
                 {
                     if ((postList[i].postId != null) && (postList[i].imageURLs != null))
                     {
-                        if () { 
+                        if (!(from post in postImages where post.postId == postList[i].postId select post).Any()) { 
                             postImages.Add(new postImage(postList[i]));
                         }
                     }
@@ -342,7 +346,7 @@ namespace VKParser
                     sw.WriteLine(json);
                 }
             }
-            public static void SerializeLinks(List<Post> postList, string filename)
+            public static void SerializeLinks(string filename)
             {
                 List<postLink> postLinks = new List<postLink>();
                 for (int i = 0; i < postList.Count(); i++)
@@ -361,7 +365,7 @@ namespace VKParser
                     sw.WriteLine(json);
                 }
             }
-            public static void SerializeText(List<Post> postList, string filename)
+            public static void SerializeText(string filename)
             {
                 List<postText> postTexts = new List<postText>();
                 for (int i = 0; i < postList.Count(); i++)
@@ -427,7 +431,7 @@ namespace VKParser
                 
             }
         }
-        internal class Post
+        public class Post
         {
             int counter;
             public string postId, text, date;
@@ -510,31 +514,29 @@ namespace VKParser
         internal class settings
         {
             string imagesFileName, linksFileName, textFileName;
-            List<Post> postList;
-            public settings(string imagesFileName, string linksFileName, string textFileName, List<Post> postList)
+            public settings(string imagesFileName, string linksFileName, string textFileName)
             {
                 this.imagesFileName = imagesFileName;
                 this.linksFileName = linksFileName;
                 this.textFileName = textFileName;
-                this.postList = postList;
             }
 
             public void imageThread()
             {
                 Console.WriteLine("Начата запись картинок!");
-                toJSON.SerializeImages(postList, imagesFileName);
+                toJSON.SerializeImages(imagesFileName);
                 Console.WriteLine("Закончена запись картинок!");
             }
             public void linkThread()
             {
                 Console.WriteLine("Начата запись ссылок!");
-                toJSON.SerializeLinks(postList, linksFileName);
+                toJSON.SerializeLinks(linksFileName);
                 Console.WriteLine("Закончена запись ссылок!");
             }
             public void textThread()
             {
                 Console.WriteLine("Начата запись текстов!");
-                toJSON.SerializeText(postList, textFileName);
+                toJSON.SerializeText(textFileName);
                 Console.WriteLine("Закончена запись текстов!");
             }
             public void imageReadThread()
