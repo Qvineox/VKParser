@@ -194,7 +194,7 @@ namespace VKParser
                         case (jsonManager.image):
                             {
                                 Console.WriteLine("ВАЖНО: Начата итерация картинок...");
-                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                Thread deserializeThread = new Thread(() => toJSON.DeserializeImages());
                                 deserializeThread.Start();
                                 textWriteThread.Start();
                                 linksWriteThread.Start();
@@ -212,7 +212,7 @@ namespace VKParser
                             {
                                 Console.WriteLine("ВАЖНО: Начата итерация текста...");
                                 imagesWriteThread.Start();
-                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                Thread deserializeThread = new Thread(() => toJSON.DeserializeText());
                                 deserializeThread.Start();
                                 linksWriteThread.Start();
 
@@ -230,7 +230,7 @@ namespace VKParser
                                 Console.WriteLine("ВАЖНО: Начата итерация текста...");
                                 imagesWriteThread.Start();
                                 textWriteThread.Start();
-                                Thread deserializeThread = new Thread(() => toJSON.Deserialize(switcher));
+                                Thread deserializeThread = new Thread(() => toJSON.DeserializeLinks());
                                 deserializeThread.Start();
 
                                 imagesWriteThread.Join();
@@ -295,6 +295,10 @@ namespace VKParser
                     postId = post.postId;
                     links = (post.links).ToArray();
                 }
+                public postLink()
+                {
+
+                }
             }
 
             [DataContract]
@@ -312,6 +316,10 @@ namespace VKParser
                     postId = post.postId;
                     text = post.text;
                 }
+                public postText()
+                {
+
+                }
             }
 
             public static void SerializeImages(string filename)
@@ -321,10 +329,10 @@ namespace VKParser
 
                 if (File.Exists("imagesT.json"))
                 {
-                    List<postImage> oldPosts = Deserialize(Parser.jsonManager.image);
+                    List<postImage> oldPosts = DeserializeImages();
                     if (oldPosts != null)
                     {
-                        postImages.AddRange(Deserialize(Parser.jsonManager.image));
+                        postImages.AddRange(oldPosts);
                     }
                 }
 
@@ -349,11 +357,24 @@ namespace VKParser
             public static void SerializeLinks(string filename)
             {
                 List<postLink> postLinks = new List<postLink>();
+
+                if (File.Exists("linksT.json"))
+                {
+                    List<postLink> oldPosts = DeserializeLinks();
+                    if (oldPosts != null)
+                    {
+                        postLinks.AddRange(oldPosts);
+                    }
+                }
+
                 for (int i = 0; i < postList.Count(); i++)
                 {
                     if ((postList[i].postId != null) && (postList[i].links != null))
                     {
-                        postLinks.Add(new postLink(postList[i]));
+                        if (!(from post in postLinks where post.postId == postList[i].postId select post).Any())
+                        {
+                            postLinks.Add(new postLink(postList[i]));
+                        }
                     }
                 }
 
@@ -368,10 +389,24 @@ namespace VKParser
             public static void SerializeText(string filename)
             {
                 List<postText> postTexts = new List<postText>();
+
+                if (File.Exists("textsT.json"))
+                {
+                    List<postText> oldPosts = DeserializeText();
+                    if (oldPosts != null)
+                    {
+                        postTexts.AddRange(oldPosts);
+                    }
+                }
+ 
                 for (int i = 0; i < postList.Count(); i++)
                 {
-                    if ((postList[i].postId != null) && (postList[i].text != null)) {
-                        postTexts.Add(new postText(postList[i]));
+                    if ((postList[i].postId != null) && (postList[i].text != null))
+                    {
+                        if (!(from post in postTexts where post.postId == postList[i].postId select post).Any())
+                        {
+                            postTexts.Add(new postText(postList[i]));
+                        }
                     }
                 }
 
@@ -383,52 +418,41 @@ namespace VKParser
                     sw.WriteLine(json);
                 }
             }
-            public static List<postImage> Deserialize(Parser.jsonManager switcher)
+            public static List<postImage> DeserializeImages()
             {
-                switch (switcher)
+                string json;
+                using (StreamReader sr = new StreamReader("imagesT.json"))
                 {
-                    case (Parser.jsonManager.image):
-                        {
-                            string json;
-                            using (StreamReader sr = new StreamReader("imagesT.json"))
-                            {
-                                json = sr.ReadToEnd();
-                            }
-
-                            JavaScriptSerializer serializer = new JavaScriptSerializer();
-                            List<postImage> images = serializer.Deserialize<List<postImage>>(json);
-                            return images;
-                        }
-                    case (Parser.jsonManager.text):
-                        {
-                            string json;
-                            using (StreamReader sr = new StreamReader("textsT.json"))
-                            {
-                                json = sr.ReadToEnd();
-                            }
-
-                            JavaScriptSerializer serializer = new JavaScriptSerializer();
-                            List<postImage> texts = serializer.Deserialize<List<postImage>>(json);
-                            return texts;
-                        }
-                    case (Parser.jsonManager.link):
-                        {
-                            string json;
-                            using (StreamReader sr = new StreamReader("linksT.json"))
-                            {
-                                json = sr.ReadToEnd();
-                            }
-
-                            JavaScriptSerializer serializer = new JavaScriptSerializer();
-                            List<postImage> links = serializer.Deserialize<List<postImage>>(json);
-                            return links;
-                        }
-                    default:
-                        {
-                            return null;
-                        }
+                    json = sr.ReadToEnd();
                 }
-                
+
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                List<postImage> images = serializer.Deserialize<List<postImage>>(json);
+                return images;
+            }
+            public static List<postLink> DeserializeLinks()
+            {
+                string json;
+                using (StreamReader sr = new StreamReader("linksT.json"))
+                {
+                    json = sr.ReadToEnd();
+                }
+
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                List<postLink> links = serializer.Deserialize<List<postLink>>(json);
+                return links;
+            }
+            public static List<postText> DeserializeText()
+            {
+                string json;
+                using (StreamReader sr = new StreamReader("textsT.json"))
+                {
+                    json = sr.ReadToEnd();
+                }
+
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                List<postText> texts = serializer.Deserialize<List<postText>>(json);
+                return texts;
             }
         }
         public class Post
