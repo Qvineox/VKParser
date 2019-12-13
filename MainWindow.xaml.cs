@@ -27,7 +27,7 @@ using SeleniumExtras.WaitHelpers;
 namespace VKParser
 {
     public partial class MainWindow : Window
-    {   
+    {
         public MainWindow()
         {
             InitializeComponent();
@@ -316,53 +316,25 @@ namespace VKParser
 
             public static void SerializeImages(List<Post> postList, string filename)
             {
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string readedJson;
-
-                using (StreamReader sr = new StreamReader("imagesT.json"))
-                {
-                    readedJson = sr.ReadToEnd();
-                }
-
                 List<postImage> postImages = new List<postImage>();
-                List<string> jsons = new List<string>(readedJson.Split('~'));
-
-                for (int i = 0; i < jsons.Count; i++)
-                {
-                    List<postImage> readedImages = serializer.Deserialize<List<postImage>>(jsons[i]);
-                    postImages.AddRange(readedImages);
-                }
-
-                List<postImage> newPostImages = new List<postImage>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
                     if ((postList[i].postId != null) && (postList[i].imageURLs != null))
                     {
-                        if (!postImages.Contains(new postImage(postList[i])))
-                        {
-                            newPostImages.Add(new postImage(postList[i]));
-                        }
+                        postImages.Add(new postImage(postList[i]));
                     }
                 }
 
-                string json = serializer.Serialize(newPostImages);
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                string json = serializer.Serialize(postImages);
 
-                using (StreamWriter sw = new StreamWriter(filename, true, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
                 {
-                    sw.WriteLine("~" + json);
+                    sw.WriteLine(json);
                 }
             }
             public static void SerializeLinks(List<Post> postList, string filename)
             {
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string readedJson;
-                using (StreamReader sr = new StreamReader("linksT.json"))
-                {
-                    readedJson = sr.ReadToEnd();
-                }
-
-                List<postLink> readedLinks = serializer.Deserialize<List<postLink>>(readedJson);
-
                 List<postLink> postLinks = new List<postLink>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
@@ -371,8 +343,8 @@ namespace VKParser
                         postLinks.Add(new postLink(postList[i]));
                     }
                 }
-                postLinks.AddRange(readedLinks);
 
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postLinks);
 
                 using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
@@ -382,15 +354,6 @@ namespace VKParser
             }
             public static void SerializeText(List<Post> postList, string filename)
             {
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string readedJson;
-                using (StreamReader sr = new StreamReader("textsT.json"))
-                {
-                    readedJson = sr.ReadToEnd();
-                }
-
-                List<postText> readedTexts = serializer.Deserialize<List<postText>>(readedJson);
-
                 List<postText> postTexts = new List<postText>();
                 for (int i = 0; i < postList.Count(); i++)
                 {
@@ -399,8 +362,7 @@ namespace VKParser
                     }
                 }
 
-                postTexts.AddRange(readedTexts);
-
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postTexts);
 
                 using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
