@@ -316,19 +316,28 @@ namespace VKParser
 
             public static void SerializeImages(List<Post> postList, string filename)
             {
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
                 List<postImage> postImages = new List<postImage>();
+
+                if (File.Exists("imagesT.json"))
+                {
+                    postImages.AddRange(Deserialize(Parser.jsonManager.image));
+                }
+
+                
                 for (int i = 0; i < postList.Count(); i++)
                 {
                     if ((postList[i].postId != null) && (postList[i].imageURLs != null))
                     {
-                        postImages.Add(new postImage(postList[i]));
+                        if () { 
+                            postImages.Add(new postImage(postList[i]));
+                        }
                     }
                 }
 
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postImages);
 
-                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.UTF8))
                 {
                     sw.WriteLine(json);
                 }
@@ -347,7 +356,7 @@ namespace VKParser
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postLinks);
 
-                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.UTF8))
                 {
                     sw.WriteLine(json);
                 }
@@ -365,12 +374,12 @@ namespace VKParser
                 JavaScriptSerializer serializer = new JavaScriptSerializer();
                 string json = serializer.Serialize(postTexts);
 
-                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.Default))
+                using (StreamWriter sw = new StreamWriter(filename, false, Encoding.UTF8))
                 {
                     sw.WriteLine(json);
                 }
             }
-            public static void Deserialize(Parser.jsonManager switcher)
+            public static List<postImage> Deserialize(Parser.jsonManager switcher)
             {
                 switch (switcher)
                 {
@@ -384,8 +393,7 @@ namespace VKParser
 
                             JavaScriptSerializer serializer = new JavaScriptSerializer();
                             List<postImage> images = serializer.Deserialize<List<postImage>>(json);
-                            Console.WriteLine(images);
-                            break;
+                            return images;
                         }
                     case (Parser.jsonManager.text):
                         {
@@ -397,8 +405,7 @@ namespace VKParser
 
                             JavaScriptSerializer serializer = new JavaScriptSerializer();
                             List<postImage> texts = serializer.Deserialize<List<postImage>>(json);
-                            Console.WriteLine(texts);
-                            break;
+                            return texts;
                         }
                     case (Parser.jsonManager.link):
                         {
@@ -410,8 +417,11 @@ namespace VKParser
 
                             JavaScriptSerializer serializer = new JavaScriptSerializer();
                             List<postImage> links = serializer.Deserialize<List<postImage>>(json);
-                            Console.WriteLine(links);
-                            break;
+                            return links;
+                        }
+                    default:
+                        {
+                            return null;
                         }
                 }
                 
